@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ôn Tập Địa Lý - Vụ Nổ Big Bang (K12 Online)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Deep space background */
+            color: #e2e8f0;
+            overflow: hidden;
+            touch-action: none; /* Prevent default touch actions for game interaction */
+        }
+
+        /* Glassmorphism Panels */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1.5rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .hidden { display: none !important; }
+
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 10px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.2s, box-shadow 0.2s, opacity 0.5s;
+            transform-origin: center center;
+            will-change: transform, left, top; /* Performance optimization */
+            box-shadow: 0 0 15px rgba(0,0,0,0.5) inset, 0 0 10px currentColor;
+        }
+
+        .orb:active {
+            transform: scale(0.95);
+        }
+
+        .orb.dragging {
+            z-index: 100;
+            opacity: 0.8;
+            transform: scale(1.1);
+            box-shadow: 0 0 30px currentColor;
+        }
+
+        .orb-question {
+            background: radial-gradient(circle at 30% 30%, #3b82f6, #1e3a8a);
+            color: white;
+            border: 2px solid #60a5fa;
+            z-index: 10;
+        }
+
+        .orb-answer {
+            background: radial-gradient(circle at 30% 30%, #10b981, #064e3b);
+            color: white;
+            border: 2px solid #34d399;
+            z-index: 5;
+        }
+
+        .orb.matched {
+            animation: blackHoleSuck 0.8s forwards;
+            pointer-events: none;
+        }
+
+        @keyframes blackHoleSuck {
+            0% { transform: scale(1) rotate(0deg); opacity: 1; }
+            50% { transform: scale(0.5) rotate(180deg); opacity: 0.8; }
+            100% { transform: scale(0) rotate(360deg); opacity: 0; }
+        }
+
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: explode 1s ease-out forwards;
+        }
+
+        @keyframes massiveExplode {
+            0% { 
+                transform: scale(0) translate(0, 0); 
+                opacity: 1; 
+                filter: brightness(3);
+            }
+            50% {
+                opacity: 1;
+            }
+            100% { 
+                transform: scale(1) translate(var(--tx), var(--ty)); 
+                opacity: 0; 
+                filter: brightness(1);
+            }
+        }
+
+        .massive-particle {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: massiveExplode 2s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+            z-index: 100;
+        }
+        
+        .victory-text-anim {
+            animation: scaleIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes scaleIn {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes explode {
+            0% { 
+                transform: scale(0) translate(0, 0); 
+                opacity: 1; 
+                filter: brightness(2);
+            }
+            100% { 
+                transform: scale(1) translate(var(--tx), var(--ty)); 
+                opacity: 0; 
+                filter: brightness(1);
+            }
+        }
+
+        /* Background Stars */
+        #starfield {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* Connecting Line */
+        #laser-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .laser-active {
+            stroke: #60a5fa;
+            stroke-width: 3;
+            stroke-dasharray: 5, 5;
+            animation: dash 1s linear infinite;
+        }
+
+        @keyframes dash {
+            to { stroke-dashoffset: -10; }
+        }
+        
+        .error-shake {
+            animation: shake 0.5s;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+        }
+    </style>
+</head>
+<body class="w-screen h-screen relative flex items-center justify-center">
+
+    <!-- Canvas for stars -->
+    <canvas id="starfield"></canvas>
+
+    <div id="registration-screen" class="glass-panel w-full max-w-md p-8 relative z-20 m-4">
+        <div class="text-center mb-6">
+            <h1 class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2 drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]">
+                BIG BANG ĐỊA LÝ
+            </h1>
+            <p class="text-sm text-gray-400 font-medium tracking-wide uppercase">Cập nhật bản đồ VN 2025</p>
+        </div>
+        
+        <form id="registration-form" class="space-y-5">
+            <div>
+                <label for="student-name" class="block text-sm font-semibold text-gray-300 mb-1">Họ và Tên Phi Hành Gia</label>
+                <input type="text" id="student-name" required class="w-full px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder-gray-500" placeholder="Nhập tên...">
+            </div>
+            <div>
+                <label for="student-class" class="block text-sm font-semibold text-gray-300 mb-1">Tàu Không Gian (Lớp)</label>
+                <input type="text" id="student-class" required class="w-full px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder-gray-500" placeholder="Ví dụ: 12A1">
+            </div>
+            
+            <div class="bg-blue-900/30 border border-blue-500/30 p-4 rounded-lg text-sm text-blue-200">
+                <p class="font-bold mb-2 flex items-center gap-2">
+                    <span class="text-xl">🚀</span> Nhiệm vụ:
+                </p>
+                <ul class="list-disc list-inside space-y-1 ml-1 text-gray-300">
+                    <li>Kéo <strong class="text-blue-400">Hành tinh Xanh (Câu hỏi)</strong> va chạm với <strong class="text-emerald-400">Hành tinh Lục (Đáp án)</strong>.</li>
+                    <li>Tạo ra các vụ nổ Big Bang để hoàn thành mốc kiến thức.</li>
+                    <li>Thời gian: <strong class="text-white">15 phút</strong>.</li>
+                    <li>Nhiên liệu: <strong id="attempts-left-text" class="text-white">2</strong> lượt.</li>
+                    <li>Phần thưởng: <strong class="text-yellow-400">+0.5 điểm</strong>.</li>
+                </ul>
+            </div>
+            
+            <button type="submit" class="w-full py-4 px-4 rounded-lg shadow-[0_0_20px_rgba(59,130,246,0.3)] text-white font-bold text-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 transform transition hover:scale-[1.02] active:scale-[0.98] uppercase tracking-wider">
+                Khởi động
+            </button>
+        </form>
+    </div>
+
+    <div id="game-screen" class="w-full h-full hidden relative z-10 flex flex-col">
+        <!-- HUD (Heads Up Display) -->
+        <div class="absolute top-0 left-0 w-full p-4 flex justify-between items-start z-30 pointer-events-none">
+            <div class="glass-panel p-3 pointer-events-auto flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold text-lg shadow-[0_0_10px_rgba(59,130,246,0.5)]">
+                    <span id="avatar-initial">HS</span>
+                </div>
+                <div>
+                    <p class="font-bold text-white text-sm" id="display-name">Tên</p>
+                    <p class="text-xs text-blue-300" id="display-class">Lớp</p>
+                </div>
+            </div>
+            
+            <div class="flex gap-4">
+                <div class="glass-panel p-2 px-4 text-center pointer-events-auto">
+                    <p class="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Năng lượng</p>
+                    <p class="text-lg font-bold text-emerald-400"><span id="matched-count">0</span>/<span id="total-pairs"></span></p>
+                </div>
+                <div class="glass-panel p-2 px-4 text-center border-red-900/50 pointer-events-auto">
+                    <p class="text-[10px] text-red-400 uppercase font-bold tracking-wider">Đếm ngược</p>
+                    <p class="text-xl font-mono font-bold text-red-500 tracking-widest" id="timer-display">15:00</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- The Universe (Playable Area) -->
+        <div id="universe" class="flex-1 relative w-full h-full overflow-hidden">
+            <svg id="laser-line">
+                <line id="laser" x1="0" y1="0" x2="0" y2="0" class="laser-active hidden" />
+            </svg>
+            <!-- Orbs will be injected here -->
+            
+            <div id="massive-big-bang" class="absolute inset-0 pointer-events-none z-40 hidden overflow-hidden">
+                <div id="massive-particles-container" class="absolute top-1/2 left-1/2 w-0 h-0"></div>
+            </div>
+        </div>
+        
+        <!-- Victory Overlay -->
+        <div id="level-complete-overlay" class="absolute inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center hidden">
+            <div class="text-center p-8 glass-panel border-emerald-500/30 transform scale-110 shadow-[0_0_50px_rgba(16,185,129,0.2)] victory-text-anim">
+                <div id="end-status-icon" class="text-7xl mb-4">🌌</div>
+                <h2 id="end-status-title" class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 mb-2 drop-shadow-[0_0_10px_rgba(16,185,129,0.5)]"></h2>
+                <p id="end-status-desc" class="text-gray-300 mb-6 text-lg"></p>
+                <button id="finish-btn" class="py-3 px-8 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold rounded-full hover:from-emerald-400 hover:to-teal-400 shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-all">
+                    Xem Tổng Kết
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="result-screen" class="glass-panel w-full max-w-md p-8 hidden text-center relative z-20 m-4">
+        <div class="text-6xl mb-4">🏆</div>
+        <h1 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 mb-2">TỔNG KẾT NHIỆM VỤ</h1>
+        <p class="text-gray-400 mb-6 font-medium text-sm uppercase tracking-wide">Dữ liệu Địa lý VN</p>
+        
+        <div class="bg-gray-800/50 border border-gray-700 rounded-xl p-6 mb-6">
+            <p class="text-xl mb-1 font-bold text-white" id="result-name"></p>
+            <p class="text-sm mb-4 text-blue-300" id="result-class"></p>
+            
+            <div class="border-t border-gray-700 pt-4">
+                <p class="text-xs text-gray-500 uppercase font-bold mb-2 tracking-widest">Độ chính xác</p>
+                <div class="text-6xl font-black text-blue-400 mb-4 drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]">
+                    <span id="final-score">0</span><span class="text-3xl text-gray-600">%</span>
+                </div>
+                <div class="inline-flex items-center justify-center gap-2 bg-yellow-500/20 text-yellow-300 px-4 py-2 rounded-lg text-sm font-bold border border-yellow-500/30" id="bonus-points-text">
+                    <span>⭐</span> Đã nhận +0.5 điểm thưởng
+                </div>
+            </div>
+        </div>
+
+        <div class="space-y-4">
+            <button id="retry-btn" class="w-full py-4 px-4 rounded-lg text-white font-bold text-lg bg-gray-700 hover:bg-gray-600 border border-gray-600 transition-colors uppercase tracking-wide">
+                Thử lại (<span id="retry-count"></span> lần)
+            </button>
+            <p id="no-retry-msg" class="hidden text-red-400 font-bold bg-red-900/30 py-3 rounded-lg border border-red-500/30">Hết nhiên liệu (Lượt chơi).</p>
+        </div>
+    </div>
+
+    <script>
+        // --- STREAMING_CHUNK:Data and State Initialization ---
+        // Dữ liệu Nội dung (Cập nhật sáp nhập tỉnh 2025 theo yêu cầu và bổ sung kiến thức)
+        const rawDataPairs = [
+            { id: "p1", source: "Điểm cực Bắc (Lũng Cú)", target: "Tỉnh Tuyên Quang" },
+            { id: "p2", source: "Điểm cực Tây (A Pa Chải)", target: "Tỉnh Điện Biên" },
+            { id: "p3", source: "Điểm cực Nam (Xóm Mũi)", target: "Tỉnh Cà Mau" },
+            { id: "p4", source: "Điểm cực Đông (Mũi Đôi)", target: "Tỉnh Khánh Hòa" },
+            { id: "p5", source: "Đường bờ biển dài 3260 km", target: "Từ Quảng Ninh đến An Giang" },
+            { id: "p6", source: "2 quần đảo xa bờ lớn nhất", target: "Trường Sa, Hoàng Sa" },
+            { id: "p7", source: "Đảo có diện tích lớn nhất (Phú Quốc)", target: "Thuộc tỉnh An Giang" },
+            { id: "p8", source: "Nằm trong nội chí tuyến", target: "Nhiệt độ trung bình cao" },
+            { id: "p9", source: "Tiếp giáp biển Đông", target: "Lượng mưa nhiều, độ ẩm lớn" },
+            { id: "p10", source: "Nằm trong vùng hoạt động của gió mùa", target: "Khí hậu có sự phân mùa" },
+            { id: "p11", source: "Vị trí địa lý (nội chí tuyến, biển, gió mùa)", target: "Làm nước ta nhiều thiên tai" },
+            { id: "p12", source: "Gần trung tâm ĐNÁ, rìa Đông bán đảo Đông Dương", target: "Động lực phát triển, áp lực cạnh tranh" },
+            { id: "p13", source: "Ngã tư đường giao thông quốc tế", target: "Thuận lợi giao lưu trao đổi hàng hóa" },
+            { id: "p14", source: "Gần vành đai sinh khoáng Thái Bình Dương", target: "Tài nguyên khoáng sản đa dạng" },
+            { id: "p15", source: "Trên đường di lưu di cư của sinh vật", target: "Sinh vật đa dạng phong phú" },
+            { id: "p16", source: "Đường cơ sở", target: "Đường nối các điểm nhô ra nhất của bờ biển" },
+            { id: "p17", source: "Biên giới quốc gia trên biển", target: "Là ranh giới ngoài của lãnh hải" },
+            { id: "p18", source: "Ngã ba Đông Dương (Việt Nam, Lào, Campuchia)", target: "Tỉnh Quảng Ngãi" },
+            { id: "p19", source: "Ngã ba biên giới Việt Nam, Lào, Trung Quốc", target: "Tỉnh Điện Biên" },
+            { id: "p20", source: "Tỉnh giáp Trung Quốc cả trên bộ và trên biển", target: "Tỉnh Quảng Ninh" },
+            { id: "p21", source: "Tỉnh giáp Campuchia cả trên bộ và trên biển", target: "Tỉnh An Giang" },
+            // Nội dung bổ sung
+            { id: "p22", source: "Lãnh hải", target: "Vùng biển thuộc chủ quyền quốc gia trên biển" },
+            { id: "p23", source: "Tiếp giáp lãnh hải", target: "Vùng biển thực hiện các biện pháp an ninh" },
+            { id: "p24", source: "Vùng đặc quyền kinh tế", target: "Hợp với lãnh hải rộng 200 hải lí" },
+            { id: "p25", source: "Diện tích lãnh thổ", target: "Vùng đất 331 nghìn km2, vùng biển > 1 triệu km2" },
+            { id: "p26", source: "Vùng biển Việt Nam", target: "Giáp với 7 quốc gia" },
+            { id: "p27", source: "Tiếp giáp trên đất liền", target: "Bắc giáp TQ, Tây giáp Lào và Campuchia" }
+        ];
+
+        let gamePairs = [];
+        let matchedCount = 0;
+        let timer;
+        let timeLeft = 15 * 60; // 15 mins
+        let maxAttempts = 2;
+        let attemptsMade = 0;
+        
+        let studentData = { name: "", className: "" };
+        
+        // Physics and Interaction State
+        let orbs = [];
+        let draggedOrb = null;
+        let isDragging = false;
+        let startTouch = { x: 0, y: 0 };
+        let orbOffset = { x: 0, y: 0 };
+        let animationFrameId;
+
+        // DOM Elements
+        const screens = {
+            registration: document.getElementById('registration-screen'),
+            game: document.getElementById('game-screen'),
+            result: document.getElementById('result-screen')
+        };
+        const universe = document.getElementById('universe');
+        const laser = document.getElementById('laser');
+
+        // --- STREAMING_CHUNK:Utility Functions ---
+        function shuffle(array) {
+            let currentIndex = array.length, randomIndex;
+            while (currentIndex !== 0) {
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex--;
+                [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+            }
+            return array;
+        }
+
+        function switchScreen(screenName) {
+            Object.values(screens).forEach(s => s.classList.add('hidden'));
+            screens[screenName].classList.remove('hidden');
+        }
+
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = seconds % 60;
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        // --- STREAMING_CHUNK:Background Starfield Animation ---
+        function initStarfield() {
+            const canvas = document.getElementById('starfield');
+            const ctx = canvas.getContext('2d');
+            let width = window.innerWidth;
+            let height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+
+            const stars = Array.from({length: 150}, () => ({
+                x: Math.random() * width,
+                y: Math.random() * height,
+                radius: Math.random() * 1.5,
+                alpha: Math.random(),
+                velocity: (Math.random() * 0.05) + 0.01
+            }));
+
+            function drawStars() {
+                ctx.clearRect(0, 0, width, height);
+                ctx.fillStyle = 'white';
+                stars.forEach(star => {
+                    ctx.globalAlpha = star.alpha;
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Twinkle and move slightly
+                    star.alpha += (Math.random() - 0.5) * 0.05;
+                    if(star.alpha < 0.1) star.alpha = 0.1;
+                    if(star.alpha > 1) star.alpha = 1;
+                    
+                    star.y -= star.velocity;
+                    if(star.y < 0) {
+                        star.y = height;
+                        star.x = Math.random() * width;
+                    }
+                });
+                requestAnimationFrame(drawStars);
+            }
+            drawStars();
+
+            window.addEventListener('resize', () => {
+                width = window.innerWidth;
+                height = window.innerHeight;
+                canvas.width = width;
+                canvas.height = height;
+            });
+        }
+        initStarfield();
+
+        // --- STREAMING_CHUNK:Game Logic & Floating Physics ---
+        function startTimer() {
+            clearInterval(timer);
+            const timerDisplay = document.getElementById('timer-display');
+            timerDisplay.classList.remove('text-red-500', 'animate-pulse');
+            timerDisplay.classList.add('text-red-400');
+            
+            timer = setInterval(() => {
+                timeLeft--;
+                timerDisplay.textContent = formatTime(timeLeft);
+                
+                if (timeLeft <= 60 && timeLeft > 0) {
+                    timerDisplay.classList.add('text-red-500', 'animate-pulse');
+                }
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    triggerEndGameSequence(false); // Time out
+                }
+            }, 1000);
+        }
+
+        function initGameData() {
+            // Select 8 pairs per round to keep the screen uncluttered but engaging
+            const shuffledRaw = shuffle([...rawDataPairs]);
+            gamePairs = shuffledRaw.slice(0, 8);
+            
+            document.getElementById('total-pairs').textContent = gamePairs.length;
+            matchedCount = 0;
+            document.getElementById('matched-count').textContent = matchedCount;
+            document.getElementById('level-complete-overlay').classList.add('hidden');
+            
+            createUniverse();
+        }
+
+        function createUniverse() {
+            // Remove old orbs except SVG
+            Array.from(universe.children).forEach(child => {
+                if(child.id !== 'laser-line') universe.removeChild(child);
+            });
+            orbs = [];
+            
+            const w = universe.clientWidth;
+            const h = universe.clientHeight;
+            // Leave space for HUD
+            const paddingX = 60;
+            const paddingTop = 100;
+            const paddingBottom = 60;
+
+            const items = [];
+            gamePairs.forEach(pair => {
+                items.push({ id: pair.id, text: pair.source, type: 'source' });
+                items.push({ id: pair.id, text: pair.target, type: 'target' });
+            });
+            shuffle(items);
+
+            items.forEach((item, index) => {
+                const orb = document.createElement('div');
+                const size = item.type === 'source' ? 100 : 90; // Sources are slightly larger
+                
+                orb.className = `orb ${item.type === 'source' ? 'orb-question shadow-blue-500/50' : 'orb-answer shadow-emerald-500/50'}`;
+                orb.dataset.pairId = item.id;
+                orb.dataset.type = item.type;
+                
+                // Content formatting
+                const textSpan = document.createElement('span');
+                textSpan.textContent = item.text;
+                textSpan.className = "text-xs pointer-events-none line-clamp-4";
+                orb.appendChild(textSpan);
+
+                // Initial Positioning (Scatter)
+                let x = paddingX + Math.random() * (w - paddingX * 2 - size);
+                let y = paddingTop + Math.random() * (h - paddingTop - paddingBottom - size);
+                
+                // Add physical properties
+                orb.style.width = size + 'px';
+                orb.style.height = size + 'px';
+                orb.style.left = x + 'px';
+                orb.style.top = y + 'px';
+                
+                // Physics vector
+                const speedObj = {
+                    vx: (Math.random() - 0.5) * 1.5,
+                    vy: (Math.random() - 0.5) * 1.5,
+                    x: x,
+                    y: y,
+                    size: size
+                };
+
+                setupOrbEvents(orb, speedObj);
+                universe.appendChild(orb);
+                orbs.push({ el: orb, phys: speedObj, data: item });
+            });
+
+            // Start physics loop
+            cancelAnimationFrame(animationFrameId);
+            gameLoop();
+        }
+
+        // --- STREAMING_CHUNK:Floating Animation Loop ---
+        function gameLoop() {
+            if(!isDragging) {
+                const w = universe.clientWidth;
+                const h = universe.clientHeight;
+                const paddingTop = 80; // HUD space
+
+                orbs.forEach(orbData => {
+                    if (orbData.el.classList.contains('matched')) return;
+
+                    let p = orbData.phys;
+                    
+                    // Move
+                    p.x += p.vx;
+                    p.y += p.vy;
+
+                    // Bounce off walls
+                    if (p.x <= 0 || p.x + p.size >= w) p.vx *= -1;
+                    if (p.y <= paddingTop || p.y + p.size >= h) p.vy *= -1;
+
+                    // Keep within bounds strictly
+                    p.x = Math.max(0, Math.min(p.x, w - p.size));
+                    p.y = Math.max(paddingTop, Math.min(p.y, h - p.size));
+
+                    // Apply
+                    orbData.el.style.transform = `translate(${p.x - parseFloat(orbData.el.style.left)}px, ${p.y - parseFloat(orbData.el.style.top)}px)`;
+                });
+            }
+            
+            // Draw Laser if dragging
+            if (isDragging && draggedOrb) {
+                drawLaser();
+            } else {
+                laser.classList.add('hidden');
+            }
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // --- STREAMING_CHUNK:Interaction (Drag & Drop) ---
+        function setupOrbEvents(orb, phys) {
+            // Touch & Mouse
+            orb.addEventListener('mousedown', handleDragStart);
+            orb.addEventListener('touchstart', handleDragStart, {passive: false});
+        }
+
+        function handleDragStart(e) {
+            if (e.target.dataset.type !== 'source') return; // Only drag questions
+            if (e.target.classList.contains('matched')) return;
+            
+            e.preventDefault();
+            isDragging = true;
+            draggedOrb = e.target;
+            
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            const rect = draggedOrb.getBoundingClientRect();
+            orbOffset.x = clientX - rect.left;
+            orbOffset.y = clientY - rect.top;
+            
+            draggedOrb.classList.add('dragging');
+            laser.classList.remove('hidden');
+            
+            document.addEventListener('mousemove', handleDragMove);
+            document.addEventListener('touchmove', handleDragMove, {passive: false});
+            document.addEventListener('mouseup', handleDragEnd);
+            document.addEventListener('touchend', handleDragEnd);
+        }
+
+        function handleDragMove(e) {
+            if (!isDragging || !draggedOrb) return;
+            e.preventDefault();
+            
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            const universeRect = universe.getBoundingClientRect();
+            
+            let newX = clientX - universeRect.left - orbOffset.x;
+            let newY = clientY - universeRect.top - orbOffset.y;
+            
+            // Update physics object directly so it doesn't snap back
+            const orbData = orbs.find(o => o.el === draggedOrb);
+            if(orbData) {
+                orbData.phys.x = newX;
+                orbData.phys.y = newY;
+            }
+            
+            // Apply visual transform immediately (override physics loop momentarily via inline styles)
+            draggedOrb.style.transform = `translate(${newX - parseFloat(draggedOrb.style.left)}px, ${newY - parseFloat(draggedOrb.style.top)}px)`;
+        }
+
+        function handleDragEnd(e) {
+            if (!isDragging) return;
+            isDragging = false;
+            
+            document.removeEventListener('mousemove', handleDragMove);
+            document.removeEventListener('touchmove', handleDragMove);
+            document.removeEventListener('mouseup', handleDragEnd);
+            document.removeEventListener('touchend', handleDragEnd);
+            
+            if(draggedOrb) {
+                draggedOrb.classList.remove('dragging');
+                checkCollision(draggedOrb);
+                draggedOrb = null;
+            }
+            laser.classList.add('hidden');
+        }
+
+        function drawLaser() {
+            if(!draggedOrb) return;
+            const orbData = orbs.find(o => o.el === draggedOrb);
+            if(!orbData) return;
+            
+            const centerX = orbData.phys.x + orbData.phys.size / 2;
+            const centerY = orbData.phys.y + orbData.phys.size / 2;
+            
+            // Find closest target orb
+            let closest = null;
+            let minDist = Infinity;
+            
+            orbs.forEach(target => {
+                if (target.data.type === 'target' && !target.el.classList.contains('matched')) {
+                    const tx = target.phys.x + target.phys.size / 2;
+                    const ty = target.phys.y + target.phys.size / 2;
+                    const dist = Math.hypot(tx - centerX, ty - centerY);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closest = {x: tx, y: ty};
+                    }
+                }
+            });
+            
+            if (closest) {
+                laser.setAttribute('x1', centerX);
+                laser.setAttribute('y1', centerY);
+                laser.setAttribute('x2', closest.x);
+                laser.setAttribute('y2', closest.y);
+            }
+        }
+
+        // --- STREAMING_CHUNK:Collision & Match Logic ---
+        function checkCollision(sourceOrb) {
+            const sourceData = orbs.find(o => o.el === sourceOrb);
+            if(!sourceData) return;
+            
+            const sCenter = {
+                x: sourceData.phys.x + sourceData.phys.size / 2,
+                y: sourceData.phys.y + sourceData.phys.size / 2
+            };
+
+            let hitTarget = null;
+            
+            for(let i=0; i<orbs.length; i++) {
+                const targetOrb = orbs[i];
+                if(targetOrb.data.type === 'target' && !targetOrb.el.classList.contains('matched')) {
+                    const tCenter = {
+                        x: targetOrb.phys.x + targetOrb.phys.size / 2,
+                        y: targetOrb.phys.y + targetOrb.phys.size / 2
+                    };
+                    
+                    const dist = Math.hypot(tCenter.x - sCenter.x, tCenter.y - sCenter.y);
+                    // Collision radius (sum of radii minus some tolerance for overlap)
+                    if(dist < (sourceData.phys.size/2 + targetOrb.phys.size/2 - 10)) {
+                        hitTarget = targetOrb;
+                        break;
+                    }
+                }
+            }
+
+            if (hitTarget) {
+                if (sourceOrb.dataset.pairId === hitTarget.el.dataset.pairId) {
+                    handleMatch(sourceData, hitTarget);
+                } else {
+                    handleMismatch(sourceOrb);
+                }
+            }
+        }
+
+        function handleMatch(sourceData, targetData) {
+            const sEl = sourceData.el;
+            const tEl = targetData.el;
+            
+            sEl.classList.add('matched');
+            tEl.classList.add('matched');
+            
+            // Move target to source for combining effect
+            tEl.style.transition = 'transform 0.3s ease-in';
+            tEl.style.transform = `translate(${sourceData.phys.x - parseFloat(tEl.style.left)}px, ${sourceData.phys.y - parseFloat(tEl.style.top)}px)`;
+
+            createBigBangEffect(sourceData.phys.x + sourceData.phys.size/2, sourceData.phys.y + sourceData.phys.size/2);
+
+            matchedCount++;
+            document.getElementById('matched-count').textContent = matchedCount;
+            
+            setTimeout(() => {
+                sEl.style.display = 'none';
+                tEl.style.display = 'none';
+                
+                if (matchedCount === gamePairs.length) {
+                    triggerEndGameSequence(true);
+                }
+            }, 800);
+        }
+
+        function handleMismatch(sourceOrb) {
+            sourceOrb.classList.add('error-shake');
+            // Give it a kick back
+            const orbData = orbs.find(o => o.el === sourceOrb);
+            if(orbData) {
+                orbData.phys.vx *= -2;
+                orbData.phys.vy *= -2;
+            }
+            setTimeout(() => sourceOrb.classList.remove('error-shake'), 500);
+        }
+
+        function createBigBangEffect(x, y) {
+            const colors = ['#60a5fa', '#34d399', '#fbbf24', '#f87171', '#c084fc'];
+            for(let i=0; i<30; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle z-40';
+                
+                const size = Math.random() * 8 + 4;
+                p.style.width = size + 'px';
+                p.style.height = size + 'px';
+                p.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                
+                p.style.left = (x - size/2) + 'px';
+                p.style.top = (y - size/2) + 'px';
+                
+                const angle = Math.random() * Math.PI * 2;
+                const distance = Math.random() * 150 + 50;
+                const tx = Math.cos(angle) * distance + 'px';
+                const ty = Math.sin(angle) * distance + 'px';
+                
+                p.style.setProperty('--tx', tx);
+                p.style.setProperty('--ty', ty);
+                p.style.boxShadow = `0 0 ${Math.random()*10+5}px ${p.style.backgroundColor}`;
+                
+                universe.appendChild(p);
+                setTimeout(() => p.remove(), 1000);
+            }
+        }
+        
+        // --- STREAMING_CHUNK:End Game Sequences ---
+        function triggerEndGameSequence(isComplete) {
+            clearInterval(timer);
+            
+            if (isComplete) {
+                // Trigger Massive Big Bang
+                triggerMassiveBigBang();
+                setTimeout(() => {
+                    showEndOverlay(true);
+                }, 1500); // Wait for explosion to peak
+            } else {
+                showEndOverlay(false);
+            }
+        }
+        
+        function triggerMassiveBigBang() {
+            const container = document.getElementById('massive-big-bang');
+            const particleContainer = document.getElementById('massive-particles-container');
+            
+            if (!container || !particleContainer) return; // Safeguard if elements don't exist
+
+            container.classList.remove('hidden');
+            particleContainer.innerHTML = ''; // Clear old particles
+            
+            const colors = ['#ffffff', '#60a5fa', '#34d399', '#fde047', '#f472b6', '#a78bfa'];
+            
+            // Create a flash
+            const flash = document.createElement('div');
+            flash.className = 'absolute inset-0 bg-white z-50';
+            flash.style.animation = 'fadeOut 1.5s ease-out forwards';
+            flash.style.opacity = '0';
+            container.appendChild(flash);
+            
+            // Add style for fadeOut if not exists
+            if (!document.getElementById('fadeOutKeyframe')) {
+                const style = document.createElement('style');
+                style.id = 'fadeOutKeyframe';
+                style.innerHTML = `@keyframes fadeOut { 0% { opacity: 1; } 100% { opacity: 0; } }`;
+                document.head.appendChild(style);
+            }
+
+            for(let i=0; i<150; i++) {
+                const p = document.createElement('div');
+                p.className = 'massive-particle';
+                
+                const size = Math.random() * 15 + 5;
+                p.style.width = size + 'px';
+                p.style.height = size + 'px';
+                p.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                
+                const angle = Math.random() * Math.PI * 2;
+                // Distribute particles across entire screen
+                const distance = Math.random() * (window.innerWidth / 1.2) + 50; 
+                
+                const tx = Math.cos(angle) * distance + 'px';
+                const ty = Math.sin(angle) * distance + 'px';
+                
+                p.style.setProperty('--tx', tx);
+                p.style.setProperty('--ty', ty);
+                p.style.boxShadow = `0 0 ${Math.random()*20+10}px ${p.style.backgroundColor}`;
+                
+                // Add slight delay for organic feel
+                p.style.animationDelay = `${Math.random() * 0.2}s`;
+                
+                particleContainer.appendChild(p);
+            }
+            
+            // Cleanup after animation
+            setTimeout(() => {
+                container.classList.add('hidden');
+                particleContainer.innerHTML = '';
+                if(flash.parentNode) flash.remove();
+            }, 2500);
+        }
+        
+        function showEndOverlay(isComplete) {
+            const overlay = document.getElementById('level-complete-overlay');
+            const title = document.getElementById('end-status-title');
+            const icon = document.getElementById('end-status-icon');
+            const desc = document.getElementById('end-status-desc');
+            const btn = document.getElementById('finish-btn');
+            
+            overlay.classList.remove('hidden');
+            
+            if (isComplete) {
+                icon.textContent = "🏆";
+                title.textContent = "CHIẾN THẮNG!";
+                title.className = "text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-emerald-400 mb-2 drop-shadow-[0_0_15px_rgba(250,204,21,0.6)]";
+                desc.textContent = "Vũ trụ kiến thức đã được mở rộng hoàn toàn.";
+                btn.className = "py-3 px-8 bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-bold rounded-full hover:from-yellow-400 hover:to-orange-400 shadow-[0_0_20px_rgba(245,158,11,0.5)] transition-all uppercase tracking-wide";
+                
+                // Force re-trigger animation
+                overlay.firstElementChild.classList.remove('victory-text-anim');
+                void overlay.firstElementChild.offsetWidth;
+                overlay.firstElementChild.classList.add('victory-text-anim');
+                
+            } else {
+                icon.textContent = "☄️";
+                title.textContent = "CỐ GẮNG LÊN!";
+                title.className = "text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400 mb-2 drop-shadow-[0_0_10px_rgba(248,113,113,0.5)]";
+                desc.textContent = "Thời gian đã hết hoặc bạn chưa kết nối đủ.";
+                btn.className = "py-3 px-8 bg-gradient-to-r from-red-500 to-orange-500 text-white font-bold rounded-full hover:from-red-400 hover:to-orange-400 shadow-[0_0_20px_rgba(239,68,68,0.4)] transition-all uppercase tracking-wide";
+            }
+            
+            // Set flag on button for result screen
+            btn.onclick = () => endGame(isComplete);
+        }
+
+        // --- STREAMING_CHUNK:Lifecycle Control ---
+        function startGame(e) {
+            if(e) e.preventDefault();
+            
+            studentData.name = document.getElementById('student-name').value;
+            studentData.className = document.getElementById('student-class').value;
+            
+            document.getElementById('display-name').textContent = studentData.name;
+            document.getElementById('display-class').textContent = "Phi đội: " + studentData.className;
+            
+            const initials = studentData.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
+            document.getElementById('avatar-initial').textContent = initials || '🚀';
+            
+            attemptsMade++;
+            timeLeft = 15 * 60;
+            
+            initGameData();
+            switchScreen('game');
+            document.getElementById('level-complete-overlay').classList.add('hidden'); // Ensure overlay is hidden on restart
+            startTimer();
+        }
+
+        function endGame(isComplete) {
+            cancelAnimationFrame(animationFrameId);
+            switchScreen('result');
+            document.getElementById('level-complete-overlay').classList.add('hidden');
+            
+            document.getElementById('result-name').textContent = studentData.name;
+            document.getElementById('result-class').textContent = studentData.className;
+            
+            const scorePercent = Math.round((matchedCount / gamePairs.length) * 100);
+            
+            // Animate Score
+            let currentScoreDisplay = 0;
+            const scoreEl = document.getElementById('final-score');
+            const interval = setInterval(() => {
+                if(currentScoreDisplay >= scorePercent) {
+                    clearInterval(interval);
+                    scoreEl.textContent = scorePercent;
+                } else {
+                    currentScoreDisplay += Math.ceil(scorePercent / 20) || 1;
+                    if(currentScoreDisplay > scorePercent) currentScoreDisplay = scorePercent;
+                    scoreEl.textContent = currentScoreDisplay;
+                }
+            }, 50);
+            
+            const bonusText = document.getElementById('bonus-points-text');
+            if (isComplete && matchedCount === gamePairs.length) {
+                bonusText.classList.remove('hidden');
+                document.querySelector('#result-screen .text-6xl').textContent = "🏆";
+            } else {
+                bonusText.classList.add('hidden');
+                document.querySelector('#result-screen .text-6xl').textContent = "💥"; // Crash symbol if not complete
+            }
+            
+            const attemptsLeft = maxAttempts - attemptsMade;
+            document.getElementById('retry-count').textContent = attemptsLeft;
+            
+            const retryBtn = document.getElementById('retry-btn');
+            const noRetryMsg = document.getElementById('no-retry-msg');
+            
+            if (attemptsLeft <= 0) {
+                retryBtn.classList.add('hidden');
+                noRetryMsg.classList.remove('hidden');
+            } else {
+                retryBtn.classList.remove('hidden');
+                noRetryMsg.classList.add('hidden');
+                document.getElementById('attempts-left-text').textContent = attemptsLeft;
+            }
+        }
+
+        // --- STREAMING_CHUNK:Init Listeners ---
+        document.getElementById('registration-form').addEventListener('submit', startGame);
+        // finish-btn listener is now handled dynamically in showEndOverlay
+        document.getElementById('retry-btn').addEventListener('click', () => {
+            document.getElementById('student-name').value = studentData.name;
+            document.getElementById('student-class').value = studentData.className;
+            switchScreen('registration');
+        });
+
+    </script>
+</body>
+</html>
